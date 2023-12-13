@@ -92,7 +92,9 @@ const HashInput: React.FC<HashInputProps> = ({
     if (value && value.msgRaw) {
       const msgRaw = value.msgRaw;
       const msgRawInt = bufferToBigInt(Buffer.from(msgRaw));
-      const msgHash = await proofGenElement.hash([msgRawInt, BigInt(0)]);
+      const msgHash = await proofGenElement.hash([BigInt(0), BigInt(0)]);
+
+      console.log("msgRawInt: %s, msgHash: %s", msgRawInt, msgHash);
 
       setFormValues(oldVals => ({
         ...oldVals,

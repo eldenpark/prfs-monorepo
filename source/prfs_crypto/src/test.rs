@@ -1,8 +1,12 @@
-use halo2curves::{ff::Field, secp256k1::Fp};
+use halo2curves::{
+    ff::{Field, PrimeField},
+    secp256k1::Fp,
+};
 use neptune::{poseidon::PoseidonConstants, Poseidon};
-use sha2::digest::typenum::U2;
+use poseidon::poseidon_k256::hash;
+use sha2::digest::typenum::{U1, U2};
 
-use crate::{hash_from_bytes, poseidon_32};
+use crate::{convert_bytes_to_field_elem_vec, hash_from_bytes, poseidon_32};
 
 #[test]
 pub fn test_poseidon() {
@@ -40,4 +44,23 @@ pub fn test_poseidon2() {
     let arg2 = &[0u8; 32];
     let res = poseidon_32(&arg1);
     println!("res: {:?}", res);
+}
+
+#[test]
+pub fn test_poseidon3() {
+    // let test_arity = 2;
+    let arr = [0u8; 64];
+    let input = convert_bytes_to_field_elem_vec(&arr).unwrap();
+    println!("input: {:?}", input);
+
+    // let result = hash(vec![Fp::ZERO, Fp::ZERO]);
+    // println!("result: {:?}", result);
+
+    let preimage = vec![Fp::ZERO, Fp::ZERO];
+    let constants = PoseidonConstants::new();
+
+    let mut h = Poseidon::<Fp, U2>::new_with_preimage(&preimage, &constants);
+    let res = h.hash();
+    let res_bytes = res.to_bytes();
+    println!("res: {:?}, bytes: {:?}", res, res_bytes);
 }
