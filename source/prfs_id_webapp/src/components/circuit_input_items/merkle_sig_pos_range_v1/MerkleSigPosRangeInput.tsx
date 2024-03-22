@@ -46,6 +46,7 @@ import {
   useCachedProveReceiptCreator,
   useMerkleSigPosRangeFormHandler,
 } from "./use_merkle_sig_pos_range_form_handler";
+import { useHandleChangeAddress } from "./use_handle_change_address";
 
 const ComputedValue: React.FC<ComputedValueProps> = ({ value }) => {
   const val = React.useMemo(() => {
@@ -84,12 +85,6 @@ const MerkleSigPosRangeInput: React.FC<MerkleSigPosRangeInputProps> = ({
   const [walletAddr, setWalletAddr] = React.useState("");
   const [rangeOptionIdx, setRangeOptionIdx] = React.useState(-1);
 
-  const { mutateAsync: getPrfsSetElement } = useMutation({
-    mutationFn: (req: GetPrfsSetElementRequest) => {
-      return treeApi({ type: "get_prfs_set_element", ...req });
-    },
-  });
-
   const { isPending: isGetLatestPrfsTreePending, mutateAsync: getLatestPrfsTreeBySetId } =
     useMutation({
       mutationFn: (req: GetLatestPrfsTreeBySetIdRequest) => {
@@ -97,21 +92,9 @@ const MerkleSigPosRangeInput: React.FC<MerkleSigPosRangeInputProps> = ({
       },
     });
 
-  const { mutateAsync: getPrfsTreeLeafIndices } = useMutation({
-    mutationFn: (req: GetPrfsTreeLeafIndicesRequest) => {
-      return treeApi({ type: "get_prfs_tree_leaf_indices", ...req });
-    },
-  });
-
   const { mutateAsync: getPrfsSetBySetId } = useMutation({
     mutationFn: (req: GetPrfsSetBySetIdRequest) => {
       return prfsApi3({ type: "get_prfs_set_by_set_id", ...req });
-    },
-  });
-
-  const { mutateAsync: getPrfsTreeNodesByPosRequest } = useMutation({
-    mutationFn: (req: GetPrfsTreeNodesByPosRequest) => {
-      return treeApi({ type: "get_prfs_tree_nodes_by_pos", ...req });
     },
   });
 
@@ -146,16 +129,6 @@ const MerkleSigPosRangeInput: React.FC<MerkleSigPosRangeInputProps> = ({
     }
     return "";
   }, [walletAddr]);
-
-  useMerkleSigPosRangeFormHandler({ setFormHandler, setFormErrors, credential, proofAction });
-
-  useCachedProveReceiptCreator({
-    presetVals,
-    usePrfsRegistry,
-    credential,
-    handleSkipCreateProof,
-    proofAction,
-  });
 
   React.useEffect(() => {
     async function fn() {
@@ -197,236 +170,259 @@ const MerkleSigPosRangeInput: React.FC<MerkleSigPosRangeInputProps> = ({
     fn().then();
   }, [circuitTypeData, setPrfsSet, getPrfsSetBySetId, setPrfsTree]);
 
-  const handleChangeAddress = React.useCallback(
-    async (addr: string) => {
-      if (!prfsSet) {
-        return;
-      }
-      if (!prfsTree) {
-        return;
-      }
-      if (!addr) {
-        return;
-      }
+  useMerkleSigPosRangeFormHandler({ setFormHandler, setFormErrors, credential, proofAction });
 
-      setWalletAddr(addr);
-      setFormErrors(prevVals => {
-        return {
-          ...prevVals,
-          merkleProof: undefined,
-        };
-      });
+  useCachedProveReceiptCreator({
+    presetVals,
+    usePrfsRegistry,
+    credential,
+    handleSkipCreateProof,
+    proofAction,
+  });
 
-      const { set_id } = prfsSet;
-      const { range_data } = circuitTypeData;
-      if (!range_data) {
-        setFormErrors(prevVals => {
-          return {
-            ...prevVals,
-            merkleProof: "range_data is empty",
-          };
-        });
-        return;
-      }
+  const handleChangeAddress = useHandleChangeAddress({
+    prfsSet,
+    prfsTree,
+    setWalletAddr,
+    setFormErrors,
+    circuitTypeData,
+    setFormHandler,
+    setRangeOptionIdx,
+    setFormValues,
+    proofAction,
+    credential,
+  });
 
-      try {
-        // Merkle setup
-        const { payload: getPrfsSetElementPayload } = await getPrfsSetElement({
-          set_id,
-          label: addr,
-        });
+  // const handleChangeAddress = React.useCallback(
+  //   async (addr: string) => {
+  //     if (!prfsSet) {
+  //       return;
+  //     }
+  //     if (!prfsTree) {
+  //       return;
+  //     }
+  //     if (!addr) {
+  //       return;
+  //     }
 
-        if (!getPrfsSetElementPayload) {
-          function handleClick() {
-            const url = `${envs.NEXT_PUBLIC_PRFS_CONSOLE_WEBAPP_ENDPOINT}/sets/${set_id}`;
-            window.parent.window.open(url);
-          }
+  //     setWalletAddr(addr);
+  //     setFormErrors(prevVals => {
+  //       return {
+  //         ...prevVals,
+  //         merkleProof: undefined,
+  //       };
+  //     });
 
-          const elem = (
-            <div>
-              <span>
-                This address doesn't exist in {prfsSet.label}. Choose a different one or{" "}
-                <button type="button" onClick={handleClick} className={styles.link}>
-                  add yours
-                </button>{" "}
-                to the set
-              </span>
-            </div>
-          );
+  //     const { set_id } = prfsSet;
+  //     const { range_data } = circuitTypeData;
+  //     if (!range_data) {
+  //       setFormErrors(prevVals => {
+  //         return {
+  //           ...prevVals,
+  //           merkleProof: "range_data is empty",
+  //         };
+  //       });
+  //       return;
+  //     }
 
-          setFormErrors(oldVal => ({
-            ...oldVal,
-            merkleProof: elem,
-          }));
-          throw new Error("no payload from prfs set element");
-        }
+  //     try {
+  //       // Merkle setup
+  //       const { payload: getPrfsSetElementPayload } = await getPrfsSetElement({
+  //         set_id,
+  //         label: addr,
+  //       });
 
-        const data = getPrfsSetElementPayload.prfs_set_element
-          ?.data as unknown as PrfsSetElementData[];
+  //       if (!getPrfsSetElementPayload) {
+  //         function handleClick() {
+  //           const url = `${envs.NEXT_PUBLIC_PRFS_CONSOLE_WEBAPP_ENDPOINT}/sets/${set_id}`;
+  //           window.parent.window.open(url);
+  //         }
 
-        if (data.length !== 2) {
-          throw new Error("Only data of cardinality 2 is currently supported");
-        }
+  //         const elem = (
+  //           <div>
+  //             <span>
+  //               This address doesn't exist in {prfsSet.label}. Choose a different one or{" "}
+  //               <button type="button" onClick={handleClick} className={styles.link}>
+  //                 add yours
+  //               </button>{" "}
+  //               to the set
+  //             </span>
+  //           </div>
+  //         );
 
-        const args: bigint[] = [];
-        await (async () => {
-          const d = data[0];
-          switch (d.type) {
-            case "WalletCm": {
-              const { hashed } = await makeWalletAtstCm(credential.secret_key, addr);
-              const cm = hexlify(hashed);
-              const cmInt = bytesToNumberLE(hashed);
+  //         setFormErrors(oldVal => ({
+  //           ...oldVal,
+  //           merkleProof: elem,
+  //         }));
+  //         throw new Error("no payload from prfs set element");
+  //       }
 
-              if (d.val !== cm) {
-                throw new Error(`Commitment does not match, addr: ${addr}`);
-              }
+  //       const data = getPrfsSetElementPayload.prfs_set_element
+  //         ?.data as unknown as PrfsSetElementData[];
 
-              args[0] = cmInt;
-              break;
-            }
-            default:
-              throw new Error("Unsupported data type for the first element");
-          }
-        })();
+  //       if (data.length !== 2) {
+  //         throw new Error("Only data of cardinality 2 is currently supported");
+  //       }
 
-        (() => {
-          const d = data[1];
-          switch (d.type) {
-            case "Int": {
-              args[1] = BigInt(d.val);
-              break;
-            }
-            default:
-              throw new Error("Unsupported data type for the second element");
-          }
-        })();
+  //       const args: bigint[] = [];
+  //       await (async () => {
+  //         const d = data[0];
+  //         switch (d.type) {
+  //           case "WalletCm": {
+  //             const { hashed } = await makeWalletAtstCm(credential.secret_key, addr);
+  //             const cm = hexlify(hashed);
+  //             const cmInt = bytesToNumberLE(hashed);
 
-        const leafBytes = await poseidon_2_bigint_le(args);
-        const leafVal = bytesToNumberLE(leafBytes);
-        console.log("leafBytes: %o, args: %s, leafVal: %s, ", leafBytes, args, leafVal);
+  //             if (d.val !== cm) {
+  //               throw new Error(`Commitment does not match, addr: ${addr}`);
+  //             }
 
-        const { payload, error } = await getPrfsTreeLeafIndices({
-          set_id,
-          leaf_vals: [leafVal.toString()],
-        });
+  //             args[0] = cmInt;
+  //             break;
+  //           }
+  //           default:
+  //             throw new Error("Unsupported data type for the first element");
+  //         }
+  //       })();
 
-        if (error) {
-          setFormErrors((prevVals: any) => {
-            return {
-              ...prevVals,
-              merkleProof: error,
-            };
-          });
-          return;
-        }
+  //       (() => {
+  //         const d = data[1];
+  //         switch (d.type) {
+  //           case "Int": {
+  //             args[1] = BigInt(d.val);
+  //             break;
+  //           }
+  //           default:
+  //             throw new Error("Unsupported data type for the second element");
+  //         }
+  //       })();
 
-        if (!payload) {
-          setFormErrors((prevVals: any) => {
-            return {
-              ...prevVals,
-              merkleProof: "Get Prfs Tree Leaf Indices failed",
-            };
-          });
-          return;
-        }
+  //       const leafBytes = await poseidon_2_bigint_le(args);
+  //       const leafVal = bytesToNumberLE(leafBytes);
+  //       console.log("leafBytes: %o, args: %s, leafVal: %s, ", leafBytes, args, leafVal);
 
-        if (payload.prfs_tree_nodes.length < 1) {
-          setFormErrors((prevVals: any) => {
-            return {
-              ...prevVals,
-              merkleProof: `${addr} is not part of a ${set_id}`,
-            };
-          });
-          return;
-        }
+  //       const { payload, error } = await getPrfsTreeLeafIndices({
+  //         set_id,
+  //         leaf_vals: [leafVal.toString()],
+  //       });
 
-        let pos_w = payload.prfs_tree_nodes[0].pos_w;
-        if (!pos_w) {
-          throw new Error("'pos_w' shouldn't be empty");
-        }
+  //       if (error) {
+  //         setFormErrors((prevVals: any) => {
+  //           return {
+  //             ...prevVals,
+  //             merkleProof: error,
+  //           };
+  //         });
+  //         return;
+  //       }
 
-        const leafIdx = Number(pos_w);
-        const siblingPath = makeSiblingPath(32, leafIdx);
-        const pathIndices = makePathIndices(32, leafIdx);
-        const siblingPos = siblingPath.map((pos_w, idx) => {
-          return { pos_h: idx, pos_w };
-        });
-        console.log("leafIdx: %o, siblingPos: %o", leafIdx, siblingPos);
+  //       if (!payload) {
+  //         setFormErrors((prevVals: any) => {
+  //           return {
+  //             ...prevVals,
+  //             merkleProof: "Get Prfs Tree Leaf Indices failed",
+  //           };
+  //         });
+  //         return;
+  //       }
 
-        const siblingNodesData = await getPrfsTreeNodesByPosRequest({
-          tree_id: prfsTree.tree_id,
-          pos: siblingPos,
-        });
+  //       if (payload.prfs_tree_nodes.length < 1) {
+  //         setFormErrors((prevVals: any) => {
+  //           return {
+  //             ...prevVals,
+  //             merkleProof: `${addr} is not part of a ${set_id}`,
+  //           };
+  //         });
+  //         return;
+  //       }
 
-        if (siblingNodesData.payload === null) {
-          throw new Error(siblingNodesData.error);
-        }
+  //       let pos_w = payload.prfs_tree_nodes[0].pos_w;
+  //       if (!pos_w) {
+  //         throw new Error("'pos_w' shouldn't be empty");
+  //       }
 
-        let siblings: BigInt[] = [];
-        for (const node of siblingNodesData.payload.prfs_tree_nodes) {
-          siblings[node.pos_h] = BigInt(node.val);
-        }
+  //       const leafIdx = Number(pos_w);
+  //       const siblingPath = makeSiblingPath(32, leafIdx);
+  //       const pathIndices = makePathIndices(32, leafIdx);
+  //       const siblingPos = siblingPath.map((pos_w, idx) => {
+  //         return { pos_h: idx, pos_w };
+  //       });
+  //       console.log("leafIdx: %o, siblingPos: %o", leafIdx, siblingPos);
 
-        for (let idx = 0; idx < 32; idx += 1) {
-          if (siblings[idx] === undefined) {
-            siblings[idx] = BigInt(0);
-          }
-        }
+  //       const siblingNodesData = await getPrfsTreeNodesByPosRequest({
+  //         tree_id: prfsTree.tree_id,
+  //         pos: siblingPos,
+  //       });
 
-        const merkleProof: SpartanMerkleProof = {
-          root: BigInt(prfsTree.merkle_root),
-          siblings: siblings as bigint[],
-          pathIndices,
-        };
+  //       if (siblingNodesData.payload === null) {
+  //         throw new Error(siblingNodesData.error);
+  //       }
 
-        // Range setup
-        let optionIdx = -1;
-        for (const [idx, option] of range_data.options.entries()) {
-          const { lower_bound, upper_bound } = option;
-          if (lower_bound <= args[1] && args[1] < upper_bound) {
-            optionIdx = idx;
-          }
-        }
+  //       let siblings: BigInt[] = [];
+  //       for (const node of siblingNodesData.payload.prfs_tree_nodes) {
+  //         siblings[node.pos_h] = BigInt(node.val);
+  //       }
 
-        if (optionIdx === -1) {
-          throw new Error("Value does not match any options");
-        }
-        setRangeOptionIdx(optionIdx);
+  //       for (let idx = 0; idx < 32; idx += 1) {
+  //         if (siblings[idx] === undefined) {
+  //           siblings[idx] = BigInt(0);
+  //         }
+  //       }
 
-        const option = range_data.options[optionIdx];
-        if (!option) {
-          throw new Error(`Option at index does not exist, idx: ${optionIdx}`);
-        }
-        const { lower_bound, upper_bound, label } = option;
+  //       const merkleProof: SpartanMerkleProof = {
+  //         root: BigInt(prfsTree.merkle_root),
+  //         siblings: siblings as bigint[],
+  //         pathIndices,
+  //       };
 
-        setFormValues(oldVal => ({
-          ...oldVal,
-          sigpos: args[0],
-          leaf: leafVal,
-          assetSize: args[1],
-          assetSizeGreaterEqThan: lower_bound,
-          assetSizeLessThan: upper_bound,
-          assetSizeLabel: label,
-          merkleProof,
-          proofAction,
-        }));
-      } catch (err) {
-        console.error(err);
-      }
-    },
-    [
-      setWalletAddr,
-      setFormValues,
-      prfsSet,
-      getPrfsTreeLeafIndices,
-      getLatestPrfsTreeBySetId,
-      setFormErrors,
-      getPrfsSetElement,
-      setRangeOptionIdx,
-      prfsTree,
-      proofAction,
-    ],
-  );
+  //       // Range setup
+  //       let optionIdx = -1;
+  //       for (const [idx, option] of range_data.options.entries()) {
+  //         const { lower_bound, upper_bound } = option;
+  //         if (lower_bound <= args[1] && args[1] < upper_bound) {
+  //           optionIdx = idx;
+  //         }
+  //       }
+
+  //       if (optionIdx === -1) {
+  //         throw new Error("Value does not match any options");
+  //       }
+  //       setRangeOptionIdx(optionIdx);
+
+  //       const option = range_data.options[optionIdx];
+  //       if (!option) {
+  //         throw new Error(`Option at index does not exist, idx: ${optionIdx}`);
+  //       }
+  //       const { lower_bound, upper_bound, label } = option;
+
+  //       setFormValues(oldVal => ({
+  //         ...oldVal,
+  //         sigpos: args[0],
+  //         leaf: leafVal,
+  //         assetSize: args[1],
+  //         assetSizeGreaterEqThan: lower_bound,
+  //         assetSizeLessThan: upper_bound,
+  //         assetSizeLabel: label,
+  //         merkleProof,
+  //         proofAction,
+  //       }));
+  //     } catch (err) {
+  //       console.error(err);
+  //     }
+  //   },
+  //   [
+  //     setWalletAddr,
+  //     setFormValues,
+  //     prfsSet,
+  //     getPrfsTreeLeafIndices,
+  //     getLatestPrfsTreeBySetId,
+  //     setFormErrors,
+  //     getPrfsSetElement,
+  //     setRangeOptionIdx,
+  //     prfsTree,
+  //     proofAction,
+  //   ],
+  // );
 
   return (
     <>
